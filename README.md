@@ -69,6 +69,29 @@ npm run dev
 | 历史回补 | `geo_backfill` | 回补任务 | 回补编号、目标数据集、起始日期 |
 | 结果导出 | `geo_export` | 导出任务 | 导出编号、快照编号、导出格式 |
 
+## 县级归属重算与对账
+
+空间关联与区域维度共用一套县级归属账本（`data/jurisdiction/<批次>_jurisdiction.json`），
+用于处理“调宽距离容差后出现相邻县候选”的场景：
+
+- **关联分层**：`spatial_join` 的结果把 `命中格内` 与 `距离内候选` 分开记录。只有
+  命中格内、且网格已登记属地标准的分段才有县级确认口径；仅距离内的候选一律不归属。
+- **重算覆盖**：调整容差后重算以原子覆盖方式重写 `spatial_join/<批次>_join.jsonl`
+  和 `region_aggregates/<批次>_region.jsonl`，并沿用原确认网格，不静默改写上一班结果；
+  同一批次只更新一条关联任务，版本号递增。
+- **确认有效期**：`POST /api/jurisdiction/confirmations` 登记县级确认并给出可续用的
+  `valid_until`；重复登记只延长有效期，改登记到别的县必须走调账。
+- **待复核明细**：无法确认归属的分段进入 `review_items`，`GET /api/jurisdiction/review-items`
+  可独立查询，与县报分栏。
+- **调账**：`POST /api/jurisdiction/review-items/evidence` 补齐边界证据后，
+  `POST /api/jurisdiction/adjustments` 记录移出旧归属、转入新归属的实际贡献；
+  同一份证据只记一次，原确认保留出处不撤销。
+- **县报核算**：`POST /api/jurisdiction/county-report` 只核算尚未提交的下期县报，
+  一趟轨迹按 `trip_id` 只计一次，区分“继续纳入原确认县 / 本期暂挂 / 待新证据后调账”；
+  已提交县报不再重算，补齐乙县证据后不会从尚未记账的县报重复扣减，也不会两县都入账。
+
+前端在“空间关联”“区域维度”两个模块下都会显示同一块归属与对账面板。
+
 ## 约定
 
 - 全部模块共享`frontend/src/views/WorkbenchView.vue|tsx`和一套资源路由。

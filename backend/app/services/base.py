@@ -118,6 +118,39 @@ class BaseModuleService:
                 written += 1
         return written
 
+    def _write_jsonl_atomic(self, filepath: Path, records: list[dict[str, Any]]) -> int:
+        """以覆盖方式原子写入JSONL文件，供可重算的数据集使用。
+
+        空间关联、区域汇总这类结果在调整阈值后需要重算；继续使用追加写入会在
+        文件里留下多份口径不同的候选。这里先写临时文件再替换，保证读取方只看到
+        最近一次完整结果。
+        """
+        _ensure_dir(filepath.parent)
+        tmp_file = filepath.with_suffix(filepath.suffix + ".tmp")
+        with open(tmp_file, "w", encoding="utf-8") as f:
+            for rec in records:
+                f.write(json.dumps(rec, ensure_ascii=False, default=str) + "\n")
+        os.replace(tmp_file, filepath)
+        return len(records)
+
+    def _read_json(self, filepath: Path, default: Any = None) -> Any:
+        """读取JSON文件；不存在或内容损坏时返回默认值。"""
+        if not filepath.exists():
+            return default
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError):
+            return default
+
+    def _write_json(self, filepath: Path, payload: Any) -> None:
+        """以覆盖方式原子写入JSON文件。"""
+        _ensure_dir(filepath.parent)
+        tmp_file = filepath.with_suffix(filepath.suffix + ".tmp")
+        with open(tmp_file, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2, default=str)
+        os.replace(tmp_file, filepath)
+
     def _read_jsonl(self, filepath: Path) -> list[dict[str, Any]]:
         """从JSONL文件读取全部记录并返回字典列表。"""
         if not filepath.exists():

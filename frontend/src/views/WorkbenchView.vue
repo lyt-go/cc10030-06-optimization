@@ -86,6 +86,8 @@
       </form>
     </div>
 
+    <JurisdictionPanel v-if="showJurisdiction" :module-key="meta.key" />
+
     <footer class="page-foot">
       <span>共 {{ total }} 条{{ meta.name }}记录</span>
       <span v-if="errorMessage" class="error-text">{{ errorMessage }}</span>
@@ -104,9 +106,12 @@ import {
   runAction as applyAction,
 } from '@/api/backend-service'
 import type { EntryRow } from '@/data/types'
+import JurisdictionPanel from '@/views/JurisdictionPanel.vue'
 
 const props = defineProps<{ moduleKey: string }>()
 const meta = moduleMeta(props.moduleKey)
+// 县级归属与对账面板只挂在区域维度与空间关联两个模块下。
+const showJurisdiction = computed(() => ['region_dim', 'spatial_join'].includes(meta.key))
 const rows = ref<EntryRow[]>([])
 const total = ref(0)
 const errorMessage = ref('')
